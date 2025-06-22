@@ -90,9 +90,11 @@ SubscriptionPro is a comprehensive, enterprise-grade subscription management pla
    - Backend API: http://localhost:5000
    - API Documentation: http://localhost:5000/docs
 
-### Sample Credentials
-- **Admin User**: admin@subscriptionpro.com / admin123
-- **Test User**: john.doe@example.com / password123
+### Development Credentials
+For local development only (not for production):
+- Check the database sample data for test accounts
+- Use Supabase dashboard to create production users
+- Never use default passwords in production
 
 ## 📁 Project Structure
 

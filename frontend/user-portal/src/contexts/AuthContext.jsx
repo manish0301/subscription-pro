@@ -42,52 +42,48 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const { apiRequest, API_ENDPOINTS } = await import('../config/api.js');
+
+      const data = await apiRequest(API_ENDPOINTS.LOGIN, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (data.user && data.token) {
         setUser(data.user);
         setToken(data.token);
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         return { success: true };
       } else {
-        return { success: false, error: data.error };
+        return { success: false, error: data.error || 'Login failed' };
       }
     } catch (error) {
+      console.error('Login error:', error);
       return { success: false, error: 'Network error. Please try again.' };
     }
   };
 
   const register = async (userData) => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const { apiRequest, API_ENDPOINTS } = await import('../config/api.js');
+
+      const data = await apiRequest(API_ENDPOINTS.REGISTER, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(userData),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (data.user && data.token) {
         setUser(data.user);
         setToken(data.token);
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         return { success: true };
       } else {
-        return { success: false, error: data.error };
+        return { success: false, error: data.error || 'Registration failed' };
       }
     } catch (error) {
+      console.error('Registration error:', error);
       return { success: false, error: 'Network error. Please try again.' };
     }
   };

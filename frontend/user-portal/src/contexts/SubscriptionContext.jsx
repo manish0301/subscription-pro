@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { apiRequest, API_ENDPOINTS } from '../config/api.js';
 
 const SubscriptionContext = createContext();
 
@@ -32,17 +33,8 @@ export const SubscriptionProvider = ({ children }) => {
 
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/subscriptions?user_id=${user.user_id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSubscriptions(data);
-      }
+      const data = await apiRequest(`${API_ENDPOINTS.SUBSCRIPTIONS}?user_id=${user.user_id}`);
+      setSubscriptions(data.subscriptions || []);
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
     } finally {
@@ -52,11 +44,8 @@ export const SubscriptionProvider = ({ children }) => {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/products?subscription_only=true');
-      if (response.ok) {
-        const data = await response.json();
-        setProducts(data);
-      }
+      const data = await apiRequest(`${API_ENDPOINTS.PRODUCTS}?subscription_only=true`);
+      setProducts(data.products || []);
     } catch (error) {
       console.error('Error fetching products:', error);
     }

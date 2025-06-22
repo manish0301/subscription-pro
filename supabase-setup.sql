@@ -62,20 +62,67 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Insert sample data
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_subscription_id ON payments(subscription_id);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+-- Users can only see their own data
+CREATE POLICY "Users can view own profile" ON users
+    FOR SELECT USING (auth.uid()::text = user_id::text);
+
+CREATE POLICY "Users can update own profile" ON users
+    FOR UPDATE USING (auth.uid()::text = user_id::text);
+
+-- Products are publicly readable
+CREATE POLICY "Products are publicly readable" ON products
+    FOR SELECT USING (true);
+
+-- Subscriptions are user-specific
+CREATE POLICY "Users can view own subscriptions" ON subscriptions
+    FOR SELECT USING (auth.uid()::text = user_id::text);
+
+CREATE POLICY "Users can update own subscriptions" ON subscriptions
+    FOR UPDATE USING (auth.uid()::text = user_id::text);
+
+-- Payments are user-specific
+CREATE POLICY "Users can view own payments" ON payments
+    FOR SELECT USING (auth.uid()::text = user_id::text);
+
+-- Insert sample data (for development only)
 INSERT INTO users (email, password_hash, first_name, last_name, user_role) VALUES
-('admin@demo.com', 'hashed_password', 'Admin', 'User', 'admin'),
-('user@demo.com', 'hashed_password', 'Test', 'User', 'customer')
+('admin@subscriptionpro.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RK.PJ/..G', 'Admin', 'User', 'admin'),
+('demo@subscriptionpro.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RK.PJ/..G', 'Demo', 'User', 'customer')
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO products (name, description, price) VALUES
-('Monthly Coffee', 'Premium coffee delivered monthly', 299.00),
-('Weekly Snacks', 'Healthy snacks delivered weekly', 199.00),
-('Quarterly Books', 'Curated books delivered quarterly', 999.00)
+('Basic Plan', 'Essential features for small businesses', 999.00),
+('Pro Plan', 'Advanced features for growing businesses', 1999.00),
+('Enterprise Plan', 'Full-featured solution for large enterprises', 4999.00)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO subscriptions (user_id, product_id, frequency, amount, start_date, next_delivery_date) VALUES
-((SELECT user_id FROM users WHERE email = 'user@demo.com'), 
- (SELECT product_id FROM products WHERE name = 'Monthly Coffee'), 
- 'monthly', 299.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '1 month')
-ON CONFLICT DO NOTHING;
+-- Create a sample subscription only if demo user exists
+INSERT INTO subscriptions (user_id, product_id, frequency, amount, start_date, next_delivery_date)
+SELECT
+    u.user_id,
+    p.product_id,
+    'monthly',
+    p.price,
+    CURRENT_DATE,
+    CURRENT_DATE + INTERVAL '1 month'
+FROM users u, products p
+WHERE u.email = 'demo@subscriptionpro.com'
+AND p.name = 'Pro Plan'
+AND NOT EXISTS (
+    SELECT 1 FROM subscriptions s
+    WHERE s.user_id = u.user_id AND s.product_id = p.product_id
+);
