@@ -3,10 +3,12 @@ import json
 import os
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+import time
 import jwt
 import hashlib
 import hmac
 import uuid
+from collections import defaultdict
 
 # Supabase client setup
 try:
@@ -16,6 +18,10 @@ except ImportError:
     SUPABASE_AVAILABLE = False
 
 class handler(BaseHTTPRequestHandler):
+    # Rate limiting storage (in production, use Redis or database)
+    _rate_limit_storage = defaultdict(list)
+    _rate_limit_enabled = os.environ.get('RATE_LIMIT_ENABLED', 'true').lower() == 'true'
+
     def __init__(self, *args, **kwargs):
         self.supabase = None
         if SUPABASE_AVAILABLE and os.environ.get('SUPABASE_URL') and os.environ.get('SUPABASE_KEY'):
@@ -28,8 +34,48 @@ class handler(BaseHTTPRequestHandler):
                 print(f"Supabase initialization error: {e}")
         super().__init__(*args, **kwargs)
 
+    def check_rate_limit(self, endpoint_type='general'):
+        """Check if request is within rate limits"""
+        if not self._rate_limit_enabled:
+            return True
+
+        # Get client IP
+        client_ip = self.headers.get('X-Forwarded-For', '').split(',')[0] if self.headers.get('X-Forwarded-For') else self.client_address[0]
+
+        # Rate limit configurations
+        rate_limits = {
+            'auth': {'requests': 10, 'window': 60},  # 10 requests per minute for auth
+            'general': {'requests': 60, 'window': 60},  # 60 requests per minute for general
+            'admin': {'requests': 100, 'window': 60}  # 100 requests per minute for admin
+        }
+
+        limit_config = rate_limits.get(endpoint_type, rate_limits['general'])
+        key = f"{client_ip}:{endpoint_type}"
+
+        current_time = time.time()
+        window_start = current_time - limit_config['window']
+
+        # Clean old requests
+        self._rate_limit_storage[key] = [
+            req_time for req_time in self._rate_limit_storage[key]
+            if req_time > window_start
+        ]
+
+        # Check if limit exceeded
+        if len(self._rate_limit_storage[key]) >= limit_config['requests']:
+            return False
+
+        # Add current request
+        self._rate_limit_storage[key].append(current_time)
+        return True
+
     def do_GET(self):
         try:
+            # Check rate limit first
+            if not self.check_rate_limit('general'):
+                self.send_error_response(429, "Rate limit exceeded. Please try again later.")
+                return
+
             parsed_path = urllib.parse.urlparse(self.path)
             path = parsed_path.path
             query_params = urllib.parse.parse_qs(parsed_path.query)
@@ -56,6 +102,29 @@ class handler(BaseHTTPRequestHandler):
                 self.handle_admin_users(query_params)
             elif path == '/admin/analytics':
                 self.handle_admin_analytics()
+            elif path.startswith('/subscriptions/') and path.endswith('/pause'):
+                subscription_id = path.split('/')[2]
+                self.handle_subscription_pause(subscription_id)
+            elif path.startswith('/subscriptions/') and path.endswith('/resume'):
+                subscription_id = path.split('/')[2]
+                self.handle_subscription_resume(subscription_id)
+            elif path.startswith('/subscriptions/') and path.endswith('/skip'):
+                subscription_id = path.split('/')[2]
+                self.handle_subscription_skip(subscription_id)
+            elif path == '/merchant/dashboard':
+                self.handle_merchant_dashboard()
+            elif path == '/merchant/products':
+                self.handle_merchant_products()
+            elif path == '/recurring-billing/process':
+                self.handle_recurring_billing()
+            elif path == '/sfcc/webhook':
+                self.handle_sfcc_webhook()
+            elif path == '/sfcc/sync/customers':
+                self.handle_sfcc_customer_sync()
+            elif path == '/sfcc/sync/products':
+                self.handle_sfcc_product_sync()
+            elif path == '/sfcc/orders':
+                self.handle_sfcc_order_creation()
             else:
                 self.send_error_response(404, "Endpoint not found")
 
@@ -70,6 +139,12 @@ class handler(BaseHTTPRequestHandler):
             # Remove /api prefix if present
             if path.startswith('/api'):
                 path = path[4:]
+
+            # Check rate limit (stricter for auth endpoints)
+            endpoint_type = 'auth' if path.startswith('/auth') else 'general'
+            if not self.check_rate_limit(endpoint_type):
+                self.send_error_response(429, "Rate limit exceeded. Please try again later.")
+                return
 
             # Add CORS headers
             self.add_cors_headers()
@@ -905,3 +980,492 @@ class handler(BaseHTTPRequestHandler):
 
         except Exception as e:
             self.send_error_response(500, f"Failed to update user: {str(e)}")
+
+    def handle_subscription_pause(self, subscription_id):
+        """Handle subscription pause"""
+        auth_header = self.headers.get('Authorization', '')
+        user_payload = self.verify_token(auth_header)
+
+        if not user_payload:
+            self.send_error_response(401, "Authentication required")
+            return
+
+        if not self.supabase:
+            self.send_error_response(503, "Database not available")
+            return
+
+        try:
+            # Check subscription ownership
+            query = self.supabase.table('subscriptions').select('*').eq('subscription_id', subscription_id)
+            if user_payload.get('role') != 'admin':
+                query = query.eq('user_id', user_payload['user_id'])
+
+            result = query.execute()
+            if not result.data:
+                self.send_error_response(404, "Subscription not found")
+                return
+
+            # Update subscription status
+            update_result = self.supabase.table('subscriptions').update({
+                'status': 'paused',
+                'updated_at': datetime.now(timezone.utc).isoformat()
+            }).eq('subscription_id', subscription_id).execute()
+
+            if update_result.data:
+                # Log the action
+                self.log_audit_action(user_payload['user_id'], 'pause_subscription', 'subscriptions', subscription_id)
+
+                response_data = {
+                    "success": True,
+                    "message": "Subscription paused successfully",
+                    "subscription": update_result.data[0]
+                }
+                self.send_json_response(response_data)
+            else:
+                self.send_error_response(500, "Failed to pause subscription")
+
+        except Exception as e:
+            self.send_error_response(500, f"Failed to pause subscription: {str(e)}")
+
+    def handle_subscription_resume(self, subscription_id):
+        """Handle subscription resume"""
+        auth_header = self.headers.get('Authorization', '')
+        user_payload = self.verify_token(auth_header)
+
+        if not user_payload:
+            self.send_error_response(401, "Authentication required")
+            return
+
+        if not self.supabase:
+            self.send_error_response(503, "Database not available")
+            return
+
+        try:
+            # Check subscription ownership
+            query = self.supabase.table('subscriptions').select('*').eq('subscription_id', subscription_id)
+            if user_payload.get('role') != 'admin':
+                query = query.eq('user_id', user_payload['user_id'])
+
+            result = query.execute()
+            if not result.data:
+                self.send_error_response(404, "Subscription not found")
+                return
+
+            # Update subscription status
+            update_result = self.supabase.table('subscriptions').update({
+                'status': 'active',
+                'updated_at': datetime.now(timezone.utc).isoformat()
+            }).eq('subscription_id', subscription_id).execute()
+
+            if update_result.data:
+                # Log the action
+                self.log_audit_action(user_payload['user_id'], 'resume_subscription', 'subscriptions', subscription_id)
+
+                response_data = {
+                    "success": True,
+                    "message": "Subscription resumed successfully",
+                    "subscription": update_result.data[0]
+                }
+                self.send_json_response(response_data)
+            else:
+                self.send_error_response(500, "Failed to resume subscription")
+
+        except Exception as e:
+            self.send_error_response(500, f"Failed to resume subscription: {str(e)}")
+
+    def handle_subscription_skip(self, subscription_id):
+        """Handle subscription skip next delivery"""
+        auth_header = self.headers.get('Authorization', '')
+        user_payload = self.verify_token(auth_header)
+
+        if not user_payload:
+            self.send_error_response(401, "Authentication required")
+            return
+
+        if not self.supabase:
+            self.send_error_response(503, "Database not available")
+            return
+
+        try:
+            # Get subscription details
+            query = self.supabase.table('subscriptions').select('*').eq('subscription_id', subscription_id)
+            if user_payload.get('role') != 'admin':
+                query = query.eq('user_id', user_payload['user_id'])
+
+            result = query.execute()
+            if not result.data:
+                self.send_error_response(404, "Subscription not found")
+                return
+
+            subscription = result.data[0]
+
+            # Calculate next delivery date
+            current_next_date = datetime.fromisoformat(subscription['next_delivery_date'].replace('Z', '+00:00'))
+
+            if subscription['frequency'] == 'weekly':
+                new_next_date = current_next_date + timedelta(weeks=1)
+            elif subscription['frequency'] == 'monthly':
+                new_next_date = current_next_date + timedelta(days=30)
+            elif subscription['frequency'] == 'quarterly':
+                new_next_date = current_next_date + timedelta(days=90)
+            elif subscription['frequency'] == 'yearly':
+                new_next_date = current_next_date + timedelta(days=365)
+            else:
+                new_next_date = current_next_date + timedelta(weeks=1)  # Default to weekly
+
+            # Update next delivery date
+            update_result = self.supabase.table('subscriptions').update({
+                'next_delivery_date': new_next_date.isoformat(),
+                'updated_at': datetime.now(timezone.utc).isoformat()
+            }).eq('subscription_id', subscription_id).execute()
+
+            if update_result.data:
+                # Log the action
+                self.log_audit_action(user_payload['user_id'], 'skip_subscription', 'subscriptions', subscription_id)
+
+                response_data = {
+                    "success": True,
+                    "message": "Next delivery skipped successfully",
+                    "subscription": update_result.data[0],
+                    "new_delivery_date": new_next_date.isoformat()
+                }
+                self.send_json_response(response_data)
+            else:
+                self.send_error_response(500, "Failed to skip delivery")
+
+        except Exception as e:
+            self.send_error_response(500, f"Failed to skip delivery: {str(e)}")
+
+    def handle_merchant_dashboard(self):
+        """Handle merchant dashboard data"""
+        auth_header = self.headers.get('Authorization', '')
+        user_payload = self.verify_token(auth_header)
+
+        if not user_payload or user_payload.get('role') != 'admin':
+            self.send_error_response(403, "Merchant access required")
+            return
+
+        if not self.supabase:
+            self.send_error_response(503, "Database not available")
+            return
+
+        try:
+            # Get comprehensive merchant metrics
+            users_result = self.supabase.table('users').select('user_id', count='exact').execute()
+            active_subs_result = self.supabase.table('subscriptions').select('subscription_id', count='exact').eq('status', 'active').execute()
+            total_revenue_result = self.supabase.table('payments').select('amount').eq('status', 'successful').execute()
+
+            # Calculate metrics
+            total_revenue = sum(float(payment['amount']) for payment in total_revenue_result.data) if total_revenue_result.data else 0
+
+            # Get subscription trends (last 6 months)
+            subscription_trends = []
+            for i in range(6):
+                month_start = datetime.now(timezone.utc).replace(day=1) - timedelta(days=30*i)
+                month_end = month_start + timedelta(days=30)
+
+                month_subs = self.supabase.table('subscriptions').select('subscription_id', count='exact').gte('created_at', month_start.isoformat()).lt('created_at', month_end.isoformat()).execute()
+
+                subscription_trends.append({
+                    'month': month_start.strftime('%b'),
+                    'subscriptions': month_subs.count or 0
+                })
+
+            dashboard_data = {
+                "success": True,
+                "metrics": {
+                    "total_users": users_result.count or 0,
+                    "active_subscriptions": active_subs_result.count or 0,
+                    "total_revenue": total_revenue,
+                    "currency": "INR",
+                    "subscription_trends": list(reversed(subscription_trends))
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+            self.send_json_response(dashboard_data)
+
+        except Exception as e:
+            self.send_error_response(500, f"Failed to fetch merchant dashboard: {str(e)}")
+
+    def log_audit_action(self, user_id, action, resource_type, resource_id, old_values=None, new_values=None):
+        """Log audit action"""
+        if not self.supabase:
+            return
+
+        try:
+            audit_data = {
+                'user_id': user_id,
+                'action': action,
+                'resource_type': resource_type,
+                'resource_id': resource_id,
+                'old_values': old_values,
+                'new_values': new_values,
+                'ip_address': self.headers.get('X-Forwarded-For', '').split(',')[0] if self.headers.get('X-Forwarded-For') else None,
+                'user_agent': self.headers.get('User-Agent'),
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+
+            self.supabase.table('audit_logs').insert(audit_data).execute()
+        except Exception as e:
+            print(f"Failed to log audit action: {e}")
+
+    def handle_recurring_billing(self):
+        """Handle recurring billing processing"""
+        # This would be called by a scheduled job
+        auth_header = self.headers.get('Authorization', '')
+
+        # Check for system/admin authentication
+        if not auth_header or not auth_header.startswith('Bearer system-'):
+            self.send_error_response(401, "System authentication required")
+            return
+
+        if not self.supabase:
+            self.send_error_response(503, "Database not available")
+            return
+
+        try:
+            # Get subscriptions due for billing
+            today = datetime.now(timezone.utc).date()
+            due_subscriptions = self.supabase.table('subscriptions').select('*').eq('status', 'active').lte('next_delivery_date', today.isoformat()).execute()
+
+            processed_count = 0
+            failed_count = 0
+
+            for subscription in due_subscriptions.data:
+                try:
+                    # Process billing for this subscription
+                    # This would integrate with payment gateway
+
+                    # Calculate next delivery date
+                    current_date = datetime.fromisoformat(subscription['next_delivery_date'])
+
+                    if subscription['frequency'] == 'weekly':
+                        next_date = current_date + timedelta(weeks=1)
+                    elif subscription['frequency'] == 'monthly':
+                        next_date = current_date + timedelta(days=30)
+                    elif subscription['frequency'] == 'quarterly':
+                        next_date = current_date + timedelta(days=90)
+                    elif subscription['frequency'] == 'yearly':
+                        next_date = current_date + timedelta(days=365)
+                    else:
+                        next_date = current_date + timedelta(weeks=1)
+
+                    # Update subscription
+                    self.supabase.table('subscriptions').update({
+                        'next_delivery_date': next_date.isoformat(),
+                        'delivery_count': (subscription.get('delivery_count', 0) + 1),
+                        'last_delivery_date': today.isoformat(),
+                        'updated_at': datetime.now(timezone.utc).isoformat()
+                    }).eq('subscription_id', subscription['subscription_id']).execute()
+
+                    processed_count += 1
+
+                except Exception as e:
+                    print(f"Failed to process subscription {subscription['subscription_id']}: {e}")
+                    failed_count += 1
+
+            response_data = {
+                "success": True,
+                "processed": processed_count,
+                "failed": failed_count,
+                "total": len(due_subscriptions.data)
+            }
+
+            self.send_json_response(response_data)
+
+        except Exception as e:
+            self.send_error_response(500, f"Failed to process recurring billing: {str(e)}")
+
+    def handle_sfcc_webhook(self):
+        """Handle SFCC webhook events"""
+        try:
+            # Get request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            webhook_data = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else '{}'
+
+            try:
+                data = json.loads(webhook_data)
+            except json.JSONDecodeError:
+                self.send_error_response(400, "Invalid JSON in webhook data")
+                return
+
+            # Verify webhook signature (implement based on SFCC webhook security)
+            # signature = self.headers.get('X-SFCC-Signature')
+            # if not self.verify_sfcc_signature(webhook_data, signature):
+            #     self.send_error_response(401, "Invalid webhook signature")
+            #     return
+
+            event_type = data.get('event_type')
+
+            if event_type == 'order.created':
+                self.process_sfcc_order_webhook(data)
+            elif event_type == 'customer.updated':
+                self.process_sfcc_customer_webhook(data)
+            elif event_type == 'product.updated':
+                self.process_sfcc_product_webhook(data)
+            else:
+                print(f"Unknown SFCC webhook event: {event_type}")
+
+            response_data = {
+                "success": True,
+                "message": "Webhook processed successfully",
+                "event_type": event_type
+            }
+
+            self.send_json_response(response_data)
+
+        except Exception as e:
+            self.send_error_response(500, f"Failed to process SFCC webhook: {str(e)}")
+
+    def process_sfcc_order_webhook(self, data):
+        """Process SFCC order webhook"""
+        try:
+            order_data = data.get('data', {})
+
+            # Check if this is a subscription order
+            if order_data.get('custom', {}).get('isSubscriptionOrder'):
+                subscription_id = order_data.get('custom', {}).get('subscriptionId')
+
+                if subscription_id and self.supabase:
+                    # Update subscription with SFCC order details
+                    self.supabase.table('subscriptions').update({
+                        'salesforce_subscription_id': order_data.get('order_no'),
+                        'updated_at': datetime.now(timezone.utc).isoformat()
+                    }).eq('subscription_id', subscription_id).execute()
+
+                    print(f"Updated subscription {subscription_id} with SFCC order {order_data.get('order_no')}")
+
+        except Exception as e:
+            print(f"Failed to process SFCC order webhook: {e}")
+
+    def process_sfcc_customer_webhook(self, data):
+        """Process SFCC customer webhook"""
+        try:
+            customer_data = data.get('data', {})
+            customer_id = customer_data.get('customer_id')
+
+            if customer_id and self.supabase:
+                # Update customer data in our system
+                update_data = {
+                    'email': customer_data.get('email'),
+                    'first_name': customer_data.get('first_name'),
+                    'last_name': customer_data.get('last_name'),
+                    'phone_number': customer_data.get('phone_home'),
+                    'updated_at': datetime.now(timezone.utc).isoformat()
+                }
+
+                # Remove None values
+                update_data = {k: v for k, v in update_data.items() if v is not None}
+
+                self.supabase.table('users').update(update_data).eq('user_id', customer_id).execute()
+                print(f"Updated customer {customer_id} from SFCC webhook")
+
+        except Exception as e:
+            print(f"Failed to process SFCC customer webhook: {e}")
+
+    def process_sfcc_product_webhook(self, data):
+        """Process SFCC product webhook"""
+        try:
+            product_data = data.get('data', {})
+            product_id = product_data.get('id')
+
+            if product_id and self.supabase:
+                # Update product data in our system
+                update_data = {
+                    'name': product_data.get('name', {}).get('default'),
+                    'description': product_data.get('short_description', {}).get('default'),
+                    'price': product_data.get('price'),
+                    'is_active': product_data.get('online', True),
+                    'salesforce_product_id': product_id,
+                    'updated_at': datetime.now(timezone.utc).isoformat()
+                }
+
+                # Remove None values
+                update_data = {k: v for k, v in update_data.items() if v is not None}
+
+                self.supabase.table('products').update(update_data).eq('salesforce_product_id', product_id).execute()
+                print(f"Updated product {product_id} from SFCC webhook")
+
+        except Exception as e:
+            print(f"Failed to process SFCC product webhook: {e}")
+
+    def handle_sfcc_customer_sync(self):
+        """Handle SFCC customer synchronization"""
+        auth_header = self.headers.get('Authorization', '')
+        user_payload = self.verify_token(auth_header)
+
+        if not user_payload or user_payload.get('role') != 'admin':
+            self.send_error_response(403, "Admin access required")
+            return
+
+        try:
+            # This would integrate with SFCC API to sync customers
+            # For now, return a success response
+            response_data = {
+                "success": True,
+                "message": "Customer sync initiated",
+                "status": "processing"
+            }
+
+            self.send_json_response(response_data)
+
+        except Exception as e:
+            self.send_error_response(500, f"Failed to sync customers: {str(e)}")
+
+    def handle_sfcc_product_sync(self):
+        """Handle SFCC product synchronization"""
+        auth_header = self.headers.get('Authorization', '')
+        user_payload = self.verify_token(auth_header)
+
+        if not user_payload or user_payload.get('role') != 'admin':
+            self.send_error_response(403, "Admin access required")
+            return
+
+        try:
+            # This would integrate with SFCC API to sync products
+            # For now, return a success response
+            response_data = {
+                "success": True,
+                "message": "Product sync initiated",
+                "status": "processing"
+            }
+
+            self.send_json_response(response_data)
+
+        except Exception as e:
+            self.send_error_response(500, f"Failed to sync products: {str(e)}")
+
+    def handle_sfcc_order_creation(self):
+        """Handle SFCC order creation for subscriptions"""
+        auth_header = self.headers.get('Authorization', '')
+        user_payload = self.verify_token(auth_header)
+
+        if not user_payload:
+            self.send_error_response(401, "Authentication required")
+            return
+
+        try:
+            # Get request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            order_data = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else '{}'
+
+            try:
+                data = json.loads(order_data)
+            except json.JSONDecodeError:
+                self.send_error_response(400, "Invalid JSON in request body")
+                return
+
+            # This would create an order in SFCC for a subscription
+            # For now, return a success response
+            response_data = {
+                "success": True,
+                "message": "SFCC order creation initiated",
+                "order_id": f"SFCC-{uuid.uuid4()}",
+                "status": "processing"
+            }
+
+            self.send_json_response(response_data, 201)
+
+        except Exception as e:
+            self.send_error_response(500, f"Failed to create SFCC order: {str(e)}")

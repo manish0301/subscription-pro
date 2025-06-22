@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SubscriptionPro - Customer Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-blue-600">SubscriptionPro</h1>
+                <nav class="flex space-x-6">
+                    <button onclick="showProducts()" class="text-gray-700 hover:text-blue-600">Products</button>
+                    <button onclick="showSubscriptions()" class="text-gray-700 hover:text-blue-600">My Subscriptions</button>
+                    <button onclick="showAccount()" class="text-gray-700 hover:text-blue-600">Account</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Products View -->
+        <div id="products-view">
+            <h2 class="text-2xl font-bold mb-6">Available Products</h2>
+            <div id="products-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold mb-2">Premium Coffee</h3>
+                    <p class="text-gray-600 mb-4">Monthly premium coffee delivery</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-2xl font-bold text-green-600">₹299</span>
+                        <button onclick="subscribe('coffee')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Subscribe</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold mb-2">Organic Snacks</h3>
+                    <p class="text-gray-600 mb-4">Weekly healthy snack box</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-2xl font-bold text-green-600">₹199</span>
+                        <button onclick="subscribe('snacks')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Subscribe</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold mb-2">Book Club</h3>
+                    <p class="text-gray-600 mb-4">Monthly curated books</p>
+                    <div class="flex justify-between items-center">
+                        <span class="text-2xl font-bold text-green-600">₹999</span>
+                        <button onclick="subscribe('books')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Subscribe</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscriptions View -->
+        <div id="subscriptions-view" class="hidden">
+            <h2 class="text-2xl font-bold mb-6">My Subscriptions</h2>
+            <div id="subscriptions-list" class="space-y-4">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-semibold">Premium Coffee</h3>
+                            <p class="text-gray-600">Monthly delivery - Next: Jan 15, 2025</p>
+                            <p class="text-green-600 font-semibold">₹299/month</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="pauseSubscription()" class="bg-yellow-500 text-white px-3 py-1 rounded text-sm">Pause</button>
+                            <button onclick="cancelSubscription()" class="bg-red-500 text-white px-3 py-1 rounded text-sm">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account View -->
+        <div id="account-view" class="hidden">
+            <h2 class="text-2xl font-bold mb-6">Account Settings</h2>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Name</label>
+                        <input type="text" value="John Doe" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" value="john@example.com" class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                </div>
+                <button class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Update Account</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function showProducts() {
+            hideAll();
+            document.getElementById('products-view').classList.remove('hidden');
+        }
+        
+        function showSubscriptions() {
+            hideAll();
+            document.getElementById('subscriptions-view').classList.remove('hidden');
+        }
+        
+        function showAccount() {
+            hideAll();
+            document.getElementById('account-view').classList.remove('hidden');
+        }
+        
+        function hideAll() {
+            document.getElementById('products-view').classList.add('hidden');
+            document.getElementById('subscriptions-view').classList.add('hidden');
+            document.getElementById('account-view').classList.add('hidden');
+        }
+        
+        function subscribe(product) {
+            alert(`Subscribing to ${product}. Payment integration will be added.`);
+        }
+        
+        function pauseSubscription() {
+            alert('Subscription paused');
+        }
+        
+        function cancelSubscription() {
+            if(confirm('Are you sure you want to cancel?')) {
+                alert('Subscription cancelled');
+            }
+        }
+    </script>
+</body>
+</html>

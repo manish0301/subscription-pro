@@ -6,27 +6,27 @@ export const API_ENDPOINTS = {
   // Authentication
   LOGIN: `${API_BASE_URL}/auth/login`,
   REGISTER: `${API_BASE_URL}/auth/register`,
-
+  
   // Users
   USERS: `${API_BASE_URL}/users`,
   USER_PROFILE: (id) => `${API_BASE_URL}/users/${id}`,
-
+  
   // Products
   PRODUCTS: `${API_BASE_URL}/products`,
   PRODUCT_DETAIL: (id) => `${API_BASE_URL}/products/${id}`,
-
+  
   // Subscriptions
   SUBSCRIPTIONS: `${API_BASE_URL}/subscriptions`,
   SUBSCRIPTION_DETAIL: (id) => `${API_BASE_URL}/subscriptions/${id}`,
-
+  
   // Payments
   PAYMENTS: `${API_BASE_URL}/payments`,
-
+  
   // Admin
   ADMIN_DASHBOARD: `${API_BASE_URL}/admin/dashboard`,
   ADMIN_USERS: `${API_BASE_URL}/admin/users`,
   ADMIN_ANALYTICS: `${API_BASE_URL}/admin/analytics`,
-
+  
   // Health Check
   HEALTH: `${API_BASE_URL.replace('/api', '')}/health`,
 };
@@ -61,7 +61,8 @@ export const apiRequest = async (url, options = {}) => {
     const response = await fetch(url, config);
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
     
     return await response.json();

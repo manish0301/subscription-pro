@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merchant Dashboard - SubscriptionPro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50">
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-blue-600">SubscriptionPro Merchant</h1>
+                <nav class="flex space-x-6">
+                    <button onclick="showDashboard()" class="text-gray-700 hover:text-blue-600">Dashboard</button>
+                    <button onclick="showProducts()" class="text-gray-700 hover:text-blue-600">Products</button>
+                    <button onclick="showSubscriptions()" class="text-gray-700 hover:text-blue-600">Subscriptions</button>
+                    <button onclick="showAnalytics()" class="text-gray-700 hover:text-blue-600">Analytics</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Dashboard View -->
+        <div id="dashboard-view">
+            <h2 class="text-2xl font-bold mb-6">Dashboard Overview</h2>
+            
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-blue-100 rounded-lg">
+                            <svg class="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm text-gray-600">Active Subscriptions</p>
+                            <p class="text-2xl font-semibold" id="active-subs">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-green-100 rounded-lg">
+                            <svg class="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm text-gray-600">Monthly Revenue</p>
+                            <p class="text-2xl font-semibold" id="monthly-revenue">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-purple-100 rounded-lg">
+                            <svg class="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm text-gray-600">New Subscribers (30d)</p>
+                            <p class="text-2xl font-semibold" id="new-subs">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="flex items-center">
+                        <div class="p-2 bg-red-100 rounded-lg">
+                            <svg class="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm text-gray-600">Churn Rate</p>
+                            <p class="text-2xl font-semibold" id="churn-rate">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-lg font-semibold mb-4">Quick Actions</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button onclick="addProduct()" class="bg-blue-600 text-white py-3 px-4 rounded hover:bg-blue-700">
+                        Add New Product
+                    </button>
+                    <button onclick="viewReports()" class="bg-green-600 text-white py-3 px-4 rounded hover:bg-green-700">
+                        View Reports
+                    </button>
+                    <button onclick="manageSettings()" class="bg-purple-600 text-white py-3 px-4 rounded hover:bg-purple-700">
+                        Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products View -->
+        <div id="products-view" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Products</h2>
+                <button onclick="addProduct()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    Add Product
+                </button>
+            </div>
+            <div id="products-list" class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subscribers</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="products-table-body">
+                        <!-- Products loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Subscriptions View -->
+        <div id="subscriptions-view" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Subscriptions</h2>
+                <select id="status-filter" onchange="filterSubscriptions()" class="border border-gray-300 rounded-md px-3 py-2">
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="canceled">Canceled</option>
+                </select>
+            </div>
+            <div id="subscriptions-list" class="space-y-4">
+                <!-- Subscriptions loaded dynamically -->
+            </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div id="analytics-view" class="hidden">
+            <h2 class="text-2xl font-bold mb-6">Analytics</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-4">Revenue Trend</h3>
+                    <canvas id="revenue-chart"></canvas>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-4">Churn Analysis</h3>
+                    <canvas id="churn-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Navigation
+        function showDashboard() {
+            hideAllViews();
+            document.getElementById('dashboard-view').classList.remove('hidden');
+            loadDashboard();
+        }
+
+        function showProducts() {
+            hideAllViews();
+            document.getElementById('products-view').classList.remove('hidden');
+            loadProducts();
+        }
+
+        function showSubscriptions() {
+            hideAllViews();
+            document.getElementById('subscriptions-view').classList.remove('hidden');
+            loadSubscriptions();
+        }
+
+        function showAnalytics() {
+            hideAllViews();
+            document.getElementById('analytics-view').classList.remove('hidden');
+            loadAnalytics();
+        }
+
+        function hideAllViews() {
+            document.getElementById('dashboard-view').classList.add('hidden');
+            document.getElementById('products-view').classList.add('hidden');
+            document.getElementById('subscriptions-view').classList.add('hidden');
+            document.getElementById('analytics-view').classList.add('hidden');
+        }
+
+        // Load Dashboard Data
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/merchant/dashboard');
+                const data = await response.json();
+                
+                document.getElementById('active-subs').textContent = data.active_subscriptions;
+                document.getElementById('monthly-revenue').textContent = '₹' + data.monthly_revenue.toLocaleString();
+                document.getElementById('new-subs').textContent = data.new_subscriptions_30d;
+                document.getElementById('churn-rate').textContent = data.churn_rate.toFixed(1) + '%';
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        // Load Products
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/merchant/products');
+                const products = await response.json();
+                
+                const tbody = document.getElementById('products-table-body');
+                tbody.innerHTML = products.map(product => `
+                    <tr>
+                        <td class="px-6 py-4">${product.name}</td>
+                        <td class="px-6 py-4">₹${product.price}</td>
+                        <td class="px-6 py-4">-</td>
+                        <td class="px-6 py-4">
+                            <button onclick="editProduct('${product.product_id}')" class="text-blue-600 hover:text-blue-800 mr-2">Edit</button>
+                            <button onclick="deleteProduct('${product.product_id}')" class="text-red-600 hover:text-red-800">Delete</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading products:', error);
+            }
+        }
+
+        // Load Subscriptions
+        async function loadSubscriptions() {
+            const status = document.getElementById('status-filter').value;
+            try {
+                const response = await fetch(`/api/merchant/subscriptions?status=${status}`);
+                const subscriptions = await response.json();
+                
+                const list = document.getElementById('subscriptions-list');
+                list.innerHTML = subscriptions.map(sub => `
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="text-lg font-semibold">${sub.product_name}</h3>
+                                <p class="text-gray-600">Customer: ${sub.customer_email}</p>
+                                <p class="text-gray-600">Amount: ₹${sub.amount} / ${sub.frequency}</p>
+                                <p class="text-gray-600">Next billing: ${new Date(sub.next_billing_date).toLocaleDateString()}</p>
+                            </div>
+                            <span class="px-3 py-1 rounded text-sm ${sub.status === 'active' ? 'bg-green-100 text-green-800' : sub.status === 'paused' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
+                                ${sub.status}
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading subscriptions:', error);
+            }
+        }
+
+        function filterSubscriptions() {
+            loadSubscriptions();
+        }
+
+        function loadAnalytics() {
+            // Load revenue chart
+            loadRevenueChart();
+            loadChurnChart();
+        }
+
+        async function loadRevenueChart() {
+            try {
+                const response = await fetch('/api/merchant/analytics/revenue?period=30');
+                const data = await response.json();
+                
+                const ctx = document.getElementById('revenue-chart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => new Date(d.date).toLocaleDateString()),
+                        datasets: [{
+                            label: 'Revenue',
+                            data: data.map(d => d.revenue),
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading revenue chart:', error);
+            }
+        }
+
+        async function loadChurnChart() {
+            try {
+                const response = await fetch('/api/merchant/analytics/churn');
+                const data = await response.json();
+                
+                const ctx = document.getElementById('churn-chart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(d => new Date(d.month).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })),
+                        datasets: [{
+                            label: 'Churned Customers',
+                            data: data.map(d => d.churned_customers),
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                            borderColor: 'rgb(239, 68, 68)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading churn chart:', error);
+            }
+        }
+
+        // Action functions
+        function addProduct() {
+            const name = prompt('Product name:');
+            const price = prompt('Price:');
+            const description = prompt('Description:');
+            
+            if (name && price && description) {
+                fetch('/api/merchant/products', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, price: parseFloat(price), description })
+                }).then(() => {
+                    alert('Product added successfully');
+                    loadProducts();
+                });
+            }
+        }
+
+        function editProduct(id) {
+            alert('Edit product functionality - to be implemented');
+        }
+
+        function deleteProduct(id) {
+            if (confirm('Are you sure you want to delete this product?')) {
+                alert('Delete functionality - to be implemented');
+            }
+        }
+
+        function viewReports() {
+            showAnalytics();
+        }
+
+        function manageSettings() {
+            alert('Settings functionality - to be implemented');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboard();
+        });
+    </script>
+</body>
+</html>

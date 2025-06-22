@@ -1,34 +1,32 @@
 {
   "builds": [
     {
-      "src": "index.py",
+      "src": "main.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/index.py"
+      "dest": "/main.py"
     },
     {
-      "src": "/admin/dashboard",
-      "dest": "/index.py"
+      "src": "/health",
+      "dest": "/main.py"
     },
     {
-      "src": "/users",
-      "dest": "/index.py"
-    },
-    {
-      "src": "/products",
-      "dest": "/index.py"
-    },
-    {
-      "src": "/subscriptions",
-      "dest": "/index.py"
+      "src": "/merchant",
+      "dest": "/main.py"
     },
     {
       "src": "/",
-      "dest": "/public/index.html"
+      "dest": "/main.py"
     }
-  ]
+  ],
+  "env": {
+    "DATABASE_URL": "@database_url",
+    "JWT_SECRET_KEY": "@jwt_secret",
+    "RAZORPAY_KEY_ID": "@razorpay_key_id",
+    "RAZORPAY_KEY_SECRET": "@razorpay_key_secret"
+  }
 }
