@@ -1,0 +1,34 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/subscription-api', './backend/subscription-api']
+  
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/subscription-api']
+  
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+    - 'run'
+    - 'deploy'
+    - 'subscription-api'
+    - '--image'
+    - 'gcr.io/$PROJECT_ID/subscription-api'
+    - '--region'
+    - 'us-central1'
+    - '--platform'
+    - 'managed'
+    - '--allow-unauthenticated'
+    - '--set-env-vars'
+    - 'DATABASE_URL=$$DATABASE_URL,JWT_SECRET_KEY=$$JWT_SECRET_KEY,RAZORPAY_KEY_ID=$$RAZORPAY_KEY_ID,RAZORPAY_KEY_SECRET=$$RAZORPAY_KEY_SECRET'
+
+substitutions:
+  _DATABASE_URL: 'postgresql://user:pass@/dbname?host=/cloudsql/project:region:instance'
+  _JWT_SECRET_KEY: 'your-jwt-secret-key'
+  _RAZORPAY_KEY_ID: 'your-razorpay-key'
+  _RAZORPAY_KEY_SECRET: 'your-razorpay-secret'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

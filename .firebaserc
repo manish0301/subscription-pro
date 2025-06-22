@@ -1,0 +1,17 @@
+{
+  "projects": {
+    "default": "subscription-pro"
+  },
+  "targets": {
+    "subscription-pro": {
+      "hosting": {
+        "user-portal": [
+          "subscription-pro"
+        ],
+        "admin-portal": [
+          "subscription-pro-admin"
+        ]
+      }
+    }
+  }
+}

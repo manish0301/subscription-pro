@@ -1,0 +1,1462 @@
+openapi: 3.0.3
+info:
+  title: SubscriptionPro API
+  description: |
+    Comprehensive API for the SubscriptionPro subscription management platform.
+    
+    This API provides endpoints for managing users, subscriptions, products, payments, and administrative functions.
+    
+    ## Authentication
+    
+    The API uses JWT (JSON Web Tokens) for authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+    
+    ## Rate Limiting
+    
+    API requests are rate limited to prevent abuse:
+    - General endpoints: 200 requests per day, 50 per hour
+    - Authentication endpoints: 5 requests per minute
+    
+    ## Error Handling
+    
+    The API returns standard HTTP status codes and JSON error responses:
+    ```json
+    {
+      "error": "Error message",
+      "code": "ERROR_CODE",
+      "details": {}
+    }
+    ```
+    
+  version: 1.0.0
+  contact:
+    name: SubscriptionPro Support
+    email: support@subscriptionpro.com
+    url: https://subscriptionpro.com/support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.subscriptionpro.com
+    description: Production server
+  - url: https://staging-api.subscriptionpro.com
+    description: Staging server
+  - url: http://localhost:5000
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+        email:
+          type: string
+          format: email
+          description: User's email address
+        first_name:
+          type: string
+          description: User's first name
+        last_name:
+          type: string
+          description: User's last name
+        phone_number:
+          type: string
+          description: User's phone number
+        date_of_birth:
+          type: string
+          format: date
+          description: User's date of birth
+        user_role:
+          type: string
+          enum: [user, admin]
+          description: User's role in the system
+        address_line1:
+          type: string
+          description: Primary address line
+        address_line2:
+          type: string
+          description: Secondary address line
+        city:
+          type: string
+          description: City
+        state:
+          type: string
+          description: State or province
+        postal_code:
+          type: string
+          description: Postal or ZIP code
+        country:
+          type: string
+          description: Country
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+        - email
+        - first_name
+        - last_name
+
+    Product:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+          description: Unique product identifier
+        name:
+          type: string
+          description: Product name
+        description:
+          type: string
+          description: Product description
+        price:
+          type: number
+          format: decimal
+          description: Product price
+        currency:
+          type: string
+          default: INR
+          description: Currency code
+        category:
+          type: string
+          description: Product category
+        is_active:
+          type: boolean
+          default: true
+          description: Whether the product is active
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - name
+        - price
+
+    Subscription:
+      type: object
+      properties:
+        subscription_id:
+          type: string
+          format: uuid
+          description: Unique subscription identifier
+        user_id:
+          type: string
+          format: uuid
+          description: User who owns the subscription
+        product_id:
+          type: string
+          format: uuid
+          description: Subscribed product
+        status:
+          type: string
+          enum: [active, paused, canceled]
+          description: Subscription status
+        frequency:
+          type: string
+          enum: [weekly, monthly, quarterly, yearly]
+          description: Delivery frequency
+        quantity:
+          type: integer
+          minimum: 1
+          description: Quantity per delivery
+        amount:
+          type: number
+          format: decimal
+          description: Subscription amount
+        currency:
+          type: string
+          default: INR
+        start_date:
+          type: string
+          format: date
+          description: Subscription start date
+        end_date:
+          type: string
+          format: date
+          description: Subscription end date (if applicable)
+        next_delivery_date:
+          type: string
+          format: date
+          description: Next scheduled delivery
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - user_id
+        - product_id
+        - frequency
+        - amount
+        - start_date
+
+    Payment:
+      type: object
+      properties:
+        payment_id:
+          type: string
+          format: uuid
+        subscription_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+        currency:
+          type: string
+          default: INR
+        payment_method:
+          type: string
+        payment_status:
+          type: string
+          enum: [pending, completed, failed, refunded]
+        gateway_transaction_id:
+          type: string
+        gateway_response:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AuditLog:
+      type: object
+      properties:
+        log_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        action_type:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: string
+          format: uuid
+        details:
+          type: string
+        ip_address:
+          type: string
+        user_agent:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          description: Additional error details
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+        refresh_token:
+          type: string
+          description: JWT refresh token
+        user:
+          $ref: '#/components/schemas/User'
+
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone_number:
+          type: string
+        date_of_birth:
+          type: string
+          format: date
+        address_line1:
+          type: string
+        address_line2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+          default: India
+      required:
+        - email
+        - password
+        - first_name
+        - last_name
+
+paths:
+  # Authentication Endpoints
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and return JWT tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: User registration
+      description: Register a new user account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Get a new access token using refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+              required:
+                - refresh_token
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+        '401':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Invalidate user session and tokens
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  # User Management Endpoints
+  /users/profile:
+    get:
+      tags:
+        - Users
+      summary: Get user profile
+      description: Retrieve the current user's profile information
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Users
+      summary: Update user profile
+      description: Update the current user's profile information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                phone_number:
+                  type: string
+                date_of_birth:
+                  type: string
+                  format: date
+                address_line1:
+                  type: string
+                address_line2:
+                  type: string
+                city:
+                  type: string
+                state:
+                  type: string
+                postal_code:
+                  type: string
+                country:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/change-password:
+    post:
+      tags:
+        - Users
+      summary: Change password
+      description: Change the current user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                current_password:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+              required:
+                - current_password
+                - new_password
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid current password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Product Endpoints
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List products
+      description: Retrieve a list of available products
+      security: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+        - name: category
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search products by name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+  /products/{product_id}:
+    get:
+      tags:
+        - Products
+      summary: Get product details
+      description: Retrieve detailed information about a specific product
+      security: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          description: Product ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Subscription Endpoints
+  /subscriptions:
+    get:
+      tags:
+        - Subscriptions
+      summary: List user subscriptions
+      description: Retrieve all subscriptions for the current user
+      parameters:
+        - name: status
+          in: query
+          description: Filter by subscription status
+          schema:
+            type: string
+            enum: [active, paused, canceled]
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Subscriptions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscriptions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Subscription'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+    post:
+      tags:
+        - Subscriptions
+      summary: Create subscription
+      description: Create a new subscription for a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product_id:
+                  type: string
+                  format: uuid
+                frequency:
+                  type: string
+                  enum: [weekly, monthly, quarterly, yearly]
+                quantity:
+                  type: integer
+                  minimum: 1
+                start_date:
+                  type: string
+                  format: date
+              required:
+                - product_id
+                - frequency
+                - start_date
+      responses:
+        '201':
+          description: Subscription created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '400':
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions/{subscription_id}:
+    get:
+      tags:
+        - Subscriptions
+      summary: Get subscription details
+      description: Retrieve detailed information about a specific subscription
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: Subscription ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Subscription details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '404':
+          description: Subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Subscriptions
+      summary: Update subscription
+      description: Update subscription details
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: Subscription ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                frequency:
+                  type: string
+                  enum: [weekly, monthly, quarterly, yearly]
+                quantity:
+                  type: integer
+                  minimum: 1
+                next_delivery_date:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Subscription updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '400':
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions/{subscription_id}/pause:
+    post:
+      tags:
+        - Subscriptions
+      summary: Pause subscription
+      description: Pause an active subscription
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: Subscription ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for pausing
+                resume_date:
+                  type: string
+                  format: date
+                  description: Optional resume date
+      responses:
+        '200':
+          description: Subscription paused successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '400':
+          description: Cannot pause subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions/{subscription_id}/resume:
+    post:
+      tags:
+        - Subscriptions
+      summary: Resume subscription
+      description: Resume a paused subscription
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: Subscription ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Subscription resumed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '400':
+          description: Cannot resume subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions/{subscription_id}/cancel:
+    post:
+      tags:
+        - Subscriptions
+      summary: Cancel subscription
+      description: Cancel an active or paused subscription
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: Subscription ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for cancellation
+                immediate:
+                  type: boolean
+                  default: false
+                  description: Cancel immediately or at end of current period
+      responses:
+        '200':
+          description: Subscription canceled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '400':
+          description: Cannot cancel subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions/{subscription_id}/skip:
+    post:
+      tags:
+        - Subscriptions
+      summary: Skip next delivery
+      description: Skip the next scheduled delivery
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: Subscription ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for skipping
+      responses:
+        '200':
+          description: Delivery skipped successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '400':
+          description: Cannot skip delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Payment Endpoints
+  /payments:
+    get:
+      tags:
+        - Payments
+      summary: List user payments
+      description: Retrieve payment history for the current user
+      parameters:
+        - name: subscription_id
+          in: query
+          description: Filter by subscription ID
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: Filter by payment status
+          schema:
+            type: string
+            enum: [pending, completed, failed, refunded]
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Payments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payment'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+  /payments/{payment_id}:
+    get:
+      tags:
+        - Payments
+      summary: Get payment details
+      description: Retrieve detailed information about a specific payment
+      parameters:
+        - name: payment_id
+          in: path
+          required: true
+          description: Payment ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Razorpay Integration Endpoints
+  /razorpay/create-order:
+    post:
+      tags:
+        - Payments
+      summary: Create Razorpay order
+      description: Create a new payment order with Razorpay
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subscription_id:
+                  type: string
+                  format: uuid
+                amount:
+                  type: number
+                  format: decimal
+                currency:
+                  type: string
+                  default: INR
+              required:
+                - subscription_id
+                - amount
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order_id:
+                    type: string
+                  amount:
+                    type: number
+                  currency:
+                    type: string
+                  key:
+                    type: string
+                    description: Razorpay key for frontend
+
+  /razorpay/verify-payment:
+    post:
+      tags:
+        - Payments
+      summary: Verify Razorpay payment
+      description: Verify payment signature and update payment status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                razorpay_order_id:
+                  type: string
+                razorpay_payment_id:
+                  type: string
+                razorpay_signature:
+                  type: string
+              required:
+                - razorpay_order_id
+                - razorpay_payment_id
+                - razorpay_signature
+      responses:
+        '200':
+          description: Payment verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+        '400':
+          description: Invalid payment signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /razorpay/webhook:
+    post:
+      tags:
+        - Payments
+      summary: Razorpay webhook
+      description: Handle Razorpay webhook events
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed successfully
+        '400':
+          description: Invalid webhook data
+
+  # Admin Endpoints
+  /admin/users:
+    get:
+      tags:
+        - Admin
+      summary: List all users (Admin)
+      description: Retrieve a list of all users (admin only)
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          description: Search users by email or name
+          schema:
+            type: string
+        - name: role
+          in: query
+          description: Filter by user role
+          schema:
+            type: string
+            enum: [user, admin]
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/subscriptions:
+    get:
+      tags:
+        - Admin
+      summary: List all subscriptions (Admin)
+      description: Retrieve a list of all subscriptions (admin only)
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          description: Filter by subscription status
+          schema:
+            type: string
+            enum: [active, paused, canceled]
+        - name: user_email
+          in: query
+          description: Filter by user email
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subscriptions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscriptions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Subscription'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+  /admin/subscriptions/{subscription_id}/modify:
+    put:
+      tags:
+        - Admin
+      summary: Modify subscription (Admin)
+      description: Modify any subscription (admin only)
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: Subscription ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, paused, canceled]
+                frequency:
+                  type: string
+                  enum: [weekly, monthly, quarterly, yearly]
+                quantity:
+                  type: integer
+                  minimum: 1
+                next_delivery_date:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Subscription modified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+
+  /admin/subscriptions/{subscription_id}/extend:
+    post:
+      tags:
+        - Admin
+      summary: Extend subscription (Admin)
+      description: Extend subscription duration (admin only)
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: Subscription ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                days:
+                  type: integer
+                  minimum: 1
+                  description: Number of days to extend
+              required:
+                - days
+      responses:
+        '200':
+          description: Subscription extended successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+
+  /admin/dashboard/stats:
+    get:
+      tags:
+        - Admin
+      summary: Get dashboard statistics (Admin)
+      description: Retrieve dashboard statistics (admin only)
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_users:
+                    type: integer
+                  active_subscriptions:
+                    type: integer
+                  monthly_revenue:
+                    type: number
+                  churn_rate:
+                    type: number
+
+  /admin/audit-logs:
+    get:
+      tags:
+        - Admin
+      summary: Get audit logs (Admin)
+      description: Retrieve system audit logs (admin only)
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 50
+        - name: action_type
+          in: query
+          description: Filter by action type
+          schema:
+            type: string
+        - name: entity_type
+          in: query
+          description: Filter by entity type
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          description: Filter by user ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Audit logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+  # Health Check Endpoint
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Check system health status
+      security: []
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: healthy
+                      redis:
+                        type: string
+                        example: healthy
+        '500':
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                  error:
+                    type: string
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Users
+    description: User profile management
+  - name: Products
+    description: Product catalog operations
+  - name: Subscriptions
+    description: Subscription management
+  - name: Payments
+    description: Payment processing and history
+  - name: Admin
+    description: Administrative operations
+  - name: System
+    description: System health and monitoring
+
