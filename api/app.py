@@ -69,5 +69,9 @@ def admin_dashboard():
         "setup_required": True
     })
 
+# Export the Flask app for Vercel
+# This is the WSGI application that Vercel will use
+application = app
+
 if __name__ == '__main__':
     app.run(debug=False)
