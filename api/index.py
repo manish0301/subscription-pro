@@ -1,117 +1,105 @@
-from flask import Flask, jsonify
+from http.server import BaseHTTPRequestHandler
+import json
 import os
+import urllib.parse
 
-app = Flask(__name__)
-
-def handler(request):
-    """Vercel serverless function handler"""
-    with app.request_context(request.environ):
-        try:
-            return app.full_dispatch_request()
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-@app.route('/')
-@app.route('/health')
-def health():
-    return jsonify({
-        "status": "healthy",
-        "message": "SubscriptionPro API v1.0 - WORKING!",
-        "environment": os.environ.get('VERCEL_ENV', 'development'),
-        "database_configured": "YES" if os.environ.get('SUPABASE_URL') else "NO",
-        "supabase_url_preview": os.environ.get('SUPABASE_URL', 'NOT_SET')[:30] + "..." if os.environ.get('SUPABASE_URL') else "NOT_SET"
-    })
-
-@app.route('/api/info')
-def api_info():
-    return jsonify({
-        "name": "SubscriptionPro API",
-        "version": "1.0.0",
-        "description": "Enterprise Subscription Management Platform",
-        "status": "DEPLOYED_AND_WORKING",
-        "endpoints": [
-            "/health - Health check",
-            "/api/users - User management",
-            "/api/products - Product catalog",
-            "/api/subscriptions - Subscription management",
-            "/api/admin/dashboard - Admin dashboard"
-        ]
-    })
-
-@app.route('/api/users')
-def users():
-    supabase_configured = bool(os.environ.get('SUPABASE_URL'))
-
-    if supabase_configured:
-        # TODO: Add actual Supabase integration
-        return jsonify({
-            "users": [],
-            "total": 0,
-            "message": "Supabase configured - Ready for data integration",
-            "supabase_status": "CONNECTED"
-        })
-    else:
-        return jsonify({
-            "users": [],
-            "total": 0,
-            "message": "Database not configured - Please set up Supabase environment variables",
-            "setup_required": True
-        })
-
-@app.route('/api/products')
-def products():
-    supabase_configured = bool(os.environ.get('SUPABASE_URL'))
-
-    if supabase_configured:
-        return jsonify({
-            "products": [
-                {"id": "1", "name": "Basic Plan", "price": 999, "currency": "INR"},
-                {"id": "2", "name": "Pro Plan", "price": 1999, "currency": "INR"},
-                {"id": "3", "name": "Enterprise Plan", "price": 4999, "currency": "INR"}
-            ],
-            "total": 3,
-            "message": "Sample products - Supabase integration ready",
-            "supabase_status": "CONNECTED"
-        })
-    else:
-        return jsonify({
-            "products": [],
-            "total": 0,
-            "message": "Database not configured - Please set up Supabase",
-            "setup_required": True
-        })
-
-@app.route('/api/subscriptions')
-def subscriptions():
-    return jsonify({
-        "subscriptions": [],
-        "total": 0,
-        "message": "Subscriptions endpoint working - Ready for Supabase integration",
-        "status": "WORKING"
-    })
-
-@app.route('/api/admin/dashboard')
-def admin_dashboard():
-    return jsonify({
-        "metrics": {
-            "total_users": 0,
-            "total_products": 3,
-            "active_subscriptions": 0,
-            "monthly_revenue": 0,
-            "currency": "INR"
-        },
-        "message": "Admin dashboard working - Ready for real data",
-        "status": "WORKING",
-        "supabase_configured": bool(os.environ.get('SUPABASE_URL'))
-    })
-
-# Error handler
-@app.errorhandler(404)
-def not_found(_error):
-    return jsonify({
-        "error": "Endpoint not found",
-        "available_endpoints": ["/health", "/api/info", "/api/users", "/api/products", "/api/subscriptions", "/api/admin/dashboard"]
-    }), 404
-
-if __name__ == '__main__':
-    app.run(debug=True)
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Parse the URL path
+        parsed_path = urllib.parse.urlparse(self.path)
+        path = parsed_path.path
+        
+        # Remove /api prefix if present
+        if path.startswith('/api'):
+            path = path[4:]
+        
+        # Route handling
+        if path == '/' or path == '/health':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            
+            response = {
+                "status": "ok",
+                "message": "SubscriptionPro Enterprise API",
+                "version": "1.0.0",
+                "database": "supabase" if os.environ.get('SUPABASE_URL') else "not_configured"
+            }
+            self.wfile.write(json.dumps(response).encode())
+            
+        elif path == '/users':
+            self.handle_users()
+        elif path == '/products':
+            self.handle_products()
+        elif path == '/subscriptions':
+            self.handle_subscriptions()
+        elif path == '/admin/dashboard':
+            self.handle_dashboard()
+        else:
+            self.send_error(404, "Endpoint not found")
+    
+    def handle_users(self):
+        supabase_url = os.environ.get('SUPABASE_URL')
+        if supabase_url:
+            # Real Supabase integration will be added here
+            users = self.get_supabase_data('users')
+        else:
+            users = {"error": "Database not configured. Please set SUPABASE_URL environment variable."}
+        
+        self.send_json_response(users)
+    
+    def handle_products(self):
+        supabase_url = os.environ.get('SUPABASE_URL')
+        if supabase_url:
+            products = self.get_supabase_data('products')
+        else:
+            products = {"error": "Database not configured. Please set SUPABASE_URL environment variable."}
+        
+        self.send_json_response(products)
+    
+    def handle_subscriptions(self):
+        supabase_url = os.environ.get('SUPABASE_URL')
+        if supabase_url:
+            subscriptions = self.get_supabase_data('subscriptions')
+        else:
+            subscriptions = {"error": "Database not configured. Please set SUPABASE_URL environment variable."}
+        
+        self.send_json_response(subscriptions)
+    
+    def handle_dashboard(self):
+        supabase_url = os.environ.get('SUPABASE_URL')
+        if supabase_url:
+            dashboard_data = {
+                "total_users": 0,
+                "total_products": 0,
+                "active_subscriptions": 0,
+                "total_revenue": 0,
+                "message": "Connect to Supabase to see real metrics"
+            }
+        else:
+            dashboard_data = {"error": "Database not configured. Please set SUPABASE_URL environment variable."}
+        
+        self.send_json_response(dashboard_data)
+    
+    def get_supabase_data(self, table):
+        # This will integrate with actual Supabase once credentials are configured
+        return {
+            "message": f"Supabase {table} endpoint ready",
+            "status": "awaiting_credentials",
+            "required_env": ["SUPABASE_URL", "SUPABASE_KEY"]
+        }
+    
+    def send_json_response(self, data):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode())
+    
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.end_headers()
