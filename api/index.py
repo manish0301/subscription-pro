@@ -2,104 +2,206 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import urllib.parse
+from datetime import datetime, timedelta
+import jwt
+import hashlib
+import hmac
+import uuid
+
+# Supabase client setup
+try:
+    from supabase import create_client, Client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
 
 class handler(BaseHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        self.supabase = None
+        if SUPABASE_AVAILABLE and os.environ.get('SUPABASE_URL') and os.environ.get('SUPABASE_KEY'):
+            try:
+                self.supabase = create_client(
+                    os.environ.get('SUPABASE_URL'),
+                    os.environ.get('SUPABASE_KEY')
+                )
+            except Exception as e:
+                print(f"Supabase initialization error: {e}")
+        super().__init__(*args, **kwargs)
+
     def do_GET(self):
-        # Parse the URL path
-        parsed_path = urllib.parse.urlparse(self.path)
-        path = parsed_path.path
-        
-        # Remove /api prefix if present
-        if path.startswith('/api'):
-            path = path[4:]
-        
-        # Route handling
-        if path == '/' or path == '/health':
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            
-            response = {
-                "status": "ok",
-                "message": "SubscriptionPro Enterprise API",
-                "version": "1.0.0",
-                "database": "supabase" if os.environ.get('SUPABASE_URL') else "not_configured"
-            }
-            self.wfile.write(json.dumps(response).encode())
-            
-        elif path == '/users':
-            self.handle_users()
-        elif path == '/products':
-            self.handle_products()
-        elif path == '/subscriptions':
-            self.handle_subscriptions()
-        elif path == '/admin/dashboard':
-            self.handle_dashboard()
-        else:
-            self.send_error(404, "Endpoint not found")
-    
-    def handle_users(self):
-        supabase_url = os.environ.get('SUPABASE_URL')
-        if supabase_url:
-            # Real Supabase integration will be added here
-            users = self.get_supabase_data('users')
-        else:
-            users = {"error": "Database not configured. Please set SUPABASE_URL environment variable."}
-        
-        self.send_json_response(users)
-    
-    def handle_products(self):
-        supabase_url = os.environ.get('SUPABASE_URL')
-        if supabase_url:
-            products = self.get_supabase_data('products')
-        else:
-            products = {"error": "Database not configured. Please set SUPABASE_URL environment variable."}
-        
-        self.send_json_response(products)
-    
-    def handle_subscriptions(self):
-        supabase_url = os.environ.get('SUPABASE_URL')
-        if supabase_url:
-            subscriptions = self.get_supabase_data('subscriptions')
-        else:
-            subscriptions = {"error": "Database not configured. Please set SUPABASE_URL environment variable."}
-        
-        self.send_json_response(subscriptions)
-    
-    def handle_dashboard(self):
-        supabase_url = os.environ.get('SUPABASE_URL')
-        if supabase_url:
-            dashboard_data = {
-                "total_users": 0,
-                "total_products": 0,
-                "active_subscriptions": 0,
-                "total_revenue": 0,
-                "message": "Connect to Supabase to see real metrics"
-            }
-        else:
-            dashboard_data = {"error": "Database not configured. Please set SUPABASE_URL environment variable."}
-        
-        self.send_json_response(dashboard_data)
-    
-    def get_supabase_data(self, table):
-        # This will integrate with actual Supabase once credentials are configured
-        return {
-            "message": f"Supabase {table} endpoint ready",
-            "status": "awaiting_credentials",
-            "required_env": ["SUPABASE_URL", "SUPABASE_KEY"]
-        }
-    
-    def send_json_response(self, data):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
-    
+        try:
+            parsed_path = urllib.parse.urlparse(self.path)
+            path = parsed_path.path
+            query_params = urllib.parse.parse_qs(parsed_path.query)
+
+            # Remove /api prefix if present
+            if path.startswith('/api'):
+                path = path[4:]
+
+            # Add CORS headers
+            self.add_cors_headers()
+
+            # Route handling
+            if path == '/' or path == '/health':
+                self.handle_health()
+            elif path == '/users':
+                self.handle_users_get(query_params)
+            elif path == '/products':
+                self.handle_products_get(query_params)
+            elif path == '/subscriptions':
+                self.handle_subscriptions_get(query_params)
+            elif path == '/admin/dashboard':
+                self.handle_dashboard()
+            elif path == '/admin/users':
+                self.handle_admin_users(query_params)
+            elif path == '/admin/analytics':
+                self.handle_admin_analytics()
+            else:
+                self.send_error_response(404, "Endpoint not found")
+
+        except Exception as e:
+            self.send_error_response(500, f"Internal server error: {str(e)}")
+
+    def do_POST(self):
+        try:
+            parsed_path = urllib.parse.urlparse(self.path)
+            path = parsed_path.path
+
+            # Remove /api prefix if present
+            if path.startswith('/api'):
+                path = path[4:]
+
+            # Add CORS headers
+            self.add_cors_headers()
+
+            # Get request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else '{}'
+
+            try:
+                data = json.loads(post_data)
+            except json.JSONDecodeError:
+                self.send_error_response(400, "Invalid JSON in request body")
+                return
+
+            # Route handling
+            if path == '/auth/login':
+                self.handle_login(data)
+            elif path == '/auth/register':
+                self.handle_register(data)
+            elif path == '/users':
+                self.handle_users_post(data)
+            elif path == '/products':
+                self.handle_products_post(data)
+            elif path == '/subscriptions':
+                self.handle_subscriptions_post(data)
+            elif path == '/payments':
+                self.handle_payments_post(data)
+            else:
+                self.send_error_response(404, "Endpoint not found")
+
+        except Exception as e:
+            self.send_error_response(500, f"Internal server error: {str(e)}")
+
+    def do_PUT(self):
+        try:
+            parsed_path = urllib.parse.urlparse(self.path)
+            path = parsed_path.path
+
+            # Remove /api prefix if present
+            if path.startswith('/api'):
+                path = path[4:]
+
+            # Add CORS headers
+            self.add_cors_headers()
+
+            # Get request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            put_data = self.rfile.read(content_length).decode('utf-8') if content_length > 0 else '{}'
+
+            try:
+                data = json.loads(put_data)
+            except json.JSONDecodeError:
+                self.send_error_response(400, "Invalid JSON in request body")
+                return
+
+            # Extract ID from path
+            path_parts = path.strip('/').split('/')
+            if len(path_parts) >= 2:
+                resource_id = path_parts[1]
+                resource_type = path_parts[0]
+
+                if resource_type == 'subscriptions':
+                    self.handle_subscriptions_put(resource_id, data)
+                elif resource_type == 'users':
+                    self.handle_users_put(resource_id, data)
+                else:
+                    self.send_error_response(404, "Resource not found")
+            else:
+                self.send_error_response(400, "Invalid resource path")
+
+        except Exception as e:
+            self.send_error_response(500, f"Internal server error: {str(e)}")
+
+    def do_DELETE(self):
+        try:
+            parsed_path = urllib.parse.urlparse(self.path)
+            path = parsed_path.path
+
+            # Remove /api prefix if present
+            if path.startswith('/api'):
+                path = path[4:]
+
+            # Add CORS headers
+            self.add_cors_headers()
+
+            # Extract ID from path
+            path_parts = path.strip('/').split('/')
+            if len(path_parts) >= 2:
+                resource_id = path_parts[1]
+                resource_type = path_parts[0]
+
+                if resource_type == 'subscriptions':
+                    self.handle_subscriptions_delete(resource_id)
+                else:
+                    self.send_error_response(404, "Resource not found")
+            else:
+                self.send_error_response(400, "Invalid resource path")
+
+        except Exception as e:
+            self.send_error_response(500, f"Internal server error: {str(e)}")
+
     def do_OPTIONS(self):
+        self.add_cors_headers()
         self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         self.end_headers()
+
+    def add_cors_headers(self):
+        """Add CORS headers for cross-origin requests"""
+        allowed_origins = os.environ.get('CORS_ORIGINS', '*').split(',')
+        origin = self.headers.get('Origin', '')
+
+        if '*' in allowed_origins or origin in allowed_origins:
+            self.send_header('Access-Control-Allow-Origin', origin or '*')
+
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Access-Control-Max-Age', '86400')
+
+    def send_json_response(self, data, status_code=200):
+        """Send JSON response with proper headers"""
+        self.send_response(status_code)
+        self.send_header('Content-Type', 'application/json')
+        self.add_cors_headers()
+        self.end_headers()
+        self.wfile.write(json.dumps(data, default=str).encode('utf-8'))
+
+    def send_error_response(self, status_code, message):
+        """Send error response"""
+        error_data = {
+            "error": message,
+            "status_code": status_code,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        self.send_json_response(error_data, status_code)
