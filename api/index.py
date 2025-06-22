@@ -255,9 +255,7 @@ def internal_error(error):
     logger.error(f"Internal error: {error}")
     return jsonify({"error": "Internal server error", "status": 500}), 500
 
-# Vercel serverless function handler
-def handler(request):
-    return app(request.environ, lambda _status, _headers: None)
-
+# Export the Flask app for Vercel
+# Vercel will automatically detect this as the WSGI application
 if __name__ == '__main__':
     app.run(debug=False, host="0.0.0.0", port=5000)
