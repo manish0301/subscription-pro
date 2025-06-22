@@ -3,13 +3,6 @@
     {
       "src": "index.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "frontend/user-portal/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
     }
   ],
   "routes": [
@@ -18,20 +11,24 @@
       "dest": "/index.py"
     },
     {
-      "src": "/admin",
-      "dest": "/frontend/user-portal/dist/index.html"
+      "src": "/admin/dashboard",
+      "dest": "/index.py"
     },
     {
-      "src": "/dashboard",
-      "dest": "/frontend/user-portal/dist/index.html"
+      "src": "/users",
+      "dest": "/index.py"
     },
     {
-      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico))",
-      "dest": "/frontend/user-portal/dist/$1"
+      "src": "/products",
+      "dest": "/index.py"
+    },
+    {
+      "src": "/subscriptions",
+      "dest": "/index.py"
     },
     {
       "src": "/",
-      "dest": "/frontend/user-portal/dist/index.html"
+      "dest": "/public/index.html"
     }
   ]
 }
